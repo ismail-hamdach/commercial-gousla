@@ -105,6 +105,7 @@ Route::group(['middleware' => ['auth', 'role:admin|employee|master|gerant BL|ger
     Route::post('scaned', [LocationController::class ,  "scaned"])->name('client.scaned');
     Route::post('qrcode', [LocationController::class ,  "qrcode"])->name('client.qrcode');
     Route::resource('depots', depotController::class);
+    Route::get('/orders/return', [OrderController::class, 'returnOrders'])->name('orders.return');
     Route::resource('orders', OrderController::class);
     Route::get('orders/validationOrd/{id}', [OrderController::class, 'validation'])->name('orders.validation');
     Route::get('orders/PDF/{id}', [OrderController::class, "IncoicePDF"]);

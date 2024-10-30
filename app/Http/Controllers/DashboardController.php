@@ -47,7 +47,18 @@ class DashboardController extends Controller
             $Products = Product::where('user_id', $user_id)->whereBetween('created_at', [$date_debut, $date_fin])->count();
             $clients = Client::where('user_id', $user_id)->whereBetween('created_at', [$date_debut, $date_fin])->count();
             $Orders = Order::where('user_id', $user_id)->latest()->take(5)->get();
-            return view('Dashboard.admin.index', compact('totalOrder', 'Turnover', 'Products', 'clients', 'Orders', 'percentage', 'totalOrderInvalid', 'totalOrdervalid', 'profit'));
+
+            $returnOrders = Order::where('user_id', $user_id)
+                ->where('payment_method', 'retour')
+                ->whereBetween('created_at', [$date_debut, $date_fin]);
+            $returnOrdersCount = $returnOrders->count();
+            $returnOrdersTotal = $returnOrders->sum('total');
+
+            return view('Dashboard.admin.index', compact(
+                'totalOrder', 'Turnover', 'Products', 'clients', 'Orders', 
+                'percentage', 'totalOrderInvalid', 'totalOrdervalid', 'profit',
+                'returnOrdersCount', 'returnOrdersTotal'
+            ));
         } else {
             $percentage = '';
             $date = \Carbon\Carbon::now();
@@ -68,7 +79,17 @@ class DashboardController extends Controller
             $Products = Product::where('user_id', $user_id)->count();
             $clients = Client::where('user_id', $user_id)->count();
             $Orders = Order::where('user_id', $user_id)->latest()->take(5)->get();
-            return view('Dashboard.admin.index', compact('totalOrder', 'Turnover', 'Products', 'clients', 'Orders', 'percentage', 'totalOrderInvalid', 'totalOrdervalid', 'profit'));
+
+            $returnOrders = Order::where('user_id', $user_id)
+                ->where('payment_method', 'retour');
+            $returnOrdersCount = $returnOrders->count();
+            $returnOrdersTotal = $returnOrders->sum('total');
+
+            return view('Dashboard.admin.index', compact(
+                'totalOrder', 'Turnover', 'Products', 'clients', 'Orders', 
+                'percentage', 'totalOrderInvalid', 'totalOrdervalid', 'profit',
+                'returnOrdersCount', 'returnOrdersTotal'
+            ));
         }
         /* } */
     }

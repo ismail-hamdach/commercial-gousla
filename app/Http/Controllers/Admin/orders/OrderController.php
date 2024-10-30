@@ -28,18 +28,48 @@ class OrderController extends Controller
      */
     public function index()
     {
-        $total = 0; 
-         $profit =  'sum(details_orders.profit )  as profit'; 
-         if (auth()->user()->hasRole('admin|master|gerant BL'))   $profit =  'sum(details_orders.qnt * (details_orders.price - details_orders.priceAchat) - details_orders.profit )  as profit';
+        $total = 0;
+        $profit =  'sum(details_orders.profit )  as profit';
+        if (auth()->user()->hasRole('admin|master|gerant BL'))   $profit =  'sum(details_orders.qnt * (details_orders.price - details_orders.priceAchat) - details_orders.profit )  as profit';
         //$Orders = Order::orderBy('created_at','DESC')->get();
-      
-        $Orders = Order::join('details_orders' ,  'details_orders.order_id' ,  '=' , 'orders.ref')->where(function($query){
-            if (!auth()->user()->hasRole('admin|master|gerant BL'))
-            $query->where('details_orders.user_id', auth()->user()->id);
-        })->orderBy('id', 'DESC')->groupByRaw('details_orders.order_id') ->selectRaw('orders.* , '.$profit)->get();
+
+        $Orders = Order::join('details_orders',  'details_orders.order_id',  '=', 'orders.ref')
+            ->where(function ($query) {
+                if (!auth()->user()->hasRole('admin|master|gerant BL'))
+                    $query->where('details_orders.user_id', auth()->user()->id);
+            })
+            ->where('orders.payment_method', '!=', 'retour')
+            ->orderBy('id', 'DESC')
+            ->groupByRaw('details_orders.order_id')
+            ->selectRaw('orders.* , ' . $profit)
+            ->get();
 
         //$detailsOrder = DetailsOrder::where('order_id','=',$Orders->ref)->get();
         return view("Dashboard.admin.orders.show", compact('Orders'));
+    }
+
+
+    public function returnOrders()
+    {
+        $total = 0;
+        $profit = 'sum(details_orders.profit) as profit';
+        if (auth()->user()->hasRole('admin|master|gerant BL')) {
+            $profit = 'sum(details_orders.qnt * (details_orders.price - details_orders.priceAchat) - details_orders.profit) as profit';
+        }
+
+        $Orders = Order::join('details_orders', 'details_orders.order_id', '=', 'orders.ref')
+            ->where(function ($query) {
+                if (!auth()->user()->hasRole('admin|master|gerant BL'))
+                    $query->where('details_orders.user_id', auth()->user()->id);
+            })
+            ->where('orders.payment_method', '=', 'retour')  // Only return orders
+            ->orderBy('id', 'DESC')
+            ->groupByRaw('details_orders.order_id')
+            ->selectRaw('orders.*, ' . $profit)
+            ->get();
+
+            return view("Dashboard.admin.orders.return", compact('Orders'));
+            // You'll need to create this view
     }
 
     public function details(Request $request)
@@ -78,21 +108,21 @@ class OrderController extends Controller
     {
         $new_Qnt  = $request->input_QNT_router;
         $ID_tedailOrder = $request->input_id_detailOrder_router;
-        if ( $new_Qnt > 0){
-            $UpdatedDetailsOrder = DetailsOrder::findOrFail( $ID_tedailOrder);
-            $oldQnt=$UpdatedDetailsOrder->QNT;
+        if ($new_Qnt > 0) {
+            $UpdatedDetailsOrder = DetailsOrder::findOrFail($ID_tedailOrder);
+            $oldQnt = $UpdatedDetailsOrder->QNT;
 
             Tracking::create([
-                'orderDetailId'=>$ID_tedailOrder,
-                'oldQuantity'=>$oldQnt,
-                'newQuantity'=>$new_Qnt,
-                'type'=>1,
-                'userId'=>auth()->user()->id
-                ]);
+                'orderDetailId' => $ID_tedailOrder,
+                'oldQuantity' => $oldQnt,
+                'newQuantity' => $new_Qnt,
+                'type' => 1,
+                'userId' => auth()->user()->id
+            ]);
             $UpdatedDetailsOrder->update([
                 'QNT' => $new_Qnt
             ]);
-            
+
             return response()->json(['code' => 1, 'msg' => 'La mise à jour avec succée']);
         }
     }
@@ -355,15 +385,15 @@ class OrderController extends Controller
     public function IncoicePDFMini($id)
     {
         $Order = Order::where('ref', "=", $id)->first();
-        
+
         // total credit
         // $totalCredit=Order::where('client_id',$Order->client_id)->selectRaw('sum(total-payer) as credit')->first()->toArray();
-        $credit_an=$Order->credit;
+        $credit_an = $Order->credit;
         $companie = Company::first();
         $DetailsOrder = DetailsOrder::where('order_id', '=', $Order->ref)->get();
         $data['total'] = $DetailsOrder->sum('total');
         $data['totalProfit'] = $DetailsOrder->sum('profit');
-        
+
         //for order
         $data['Referance_order'] = $Order->ref;
         $data['date_order'] = $Order->created_at;
@@ -381,14 +411,14 @@ class OrderController extends Controller
         // $data['showCredit']=$credit;
 
         //for companie
-        $data['company_name'] =null ;
-        $data['GSM']=null  ;
-        $data['phone']=null ;
-        $data['addresse'] =null ;
-        $data['email']=null ;
-        $data['logo']=null;
-        $data['ICE'] =null;
-        if (isset($companie)){
+        $data['company_name'] = null;
+        $data['GSM'] = null;
+        $data['phone'] = null;
+        $data['addresse'] = null;
+        $data['email'] = null;
+        $data['logo'] = null;
+        $data['ICE'] = null;
+        if (isset($companie)) {
             $data['company_name'] = $companie->name;
             $data['GSM'] = $companie->GSM;
             $data['phone'] = $companie->phone;
@@ -396,19 +426,18 @@ class OrderController extends Controller
             $data['email'] = $companie->email;
             $data['logo'] = $companie->logo;
             $data['ICE'] = $companie->ICE;
-            
         }
 
         //for products
 
-      return view('Dashboard.admin.Order_PDF.mini_Pdf', with([
-                'data'=>$data,
-                'DetailsOrder'=>$DetailsOrder,
-                'companie'=>$companie,
-                'orders'=>$Order,
-                ]
-            ));
-        
+        return view('Dashboard.admin.Order_PDF.mini_Pdf', with(
+            [
+                'data' => $data,
+                'DetailsOrder' => $DetailsOrder,
+                'companie' => $companie,
+                'orders' => $Order,
+            ]
+        ));
     }
 
     /**
@@ -435,8 +464,8 @@ class OrderController extends Controller
     {
         $productS = productsession::where('product_ref', "=", $request->id)->where('user_id', auth()->user()->id)->first();
         if ($productS != null) {
-             $product = Product::where('ref', $request->id)->first() ;
-             $product->update(['QNT'=>$product->QNT   + $productS->QNT ]);
+            $product = Product::where('ref', $request->id)->first();
+            $product->update(['QNT' => $product->QNT   + $productS->QNT]);
             $productS->delete();
             return response()->json(['code' => 1, 'msg' => 'Bien supprimé']);
         }
@@ -453,14 +482,14 @@ class OrderController extends Controller
 
     public function UpdateDataProductSession(Request $request)
     {
-      
+
         $productSession = productsession::where('product_ref', "=", $request->product_ref)->where('user_id', auth()->user()->id)->first();
-        $oldQnt=  $productSession->QNT ; 
+        $oldQnt =  $productSession->QNT;
 
         //incrisse Qnt product
         $product = Product::where('ref', $request->product_ref)->first();
 
-        if (  $product->QNT   - (   $request->valueQNT -  $oldQnt  )  < 0 )  {
+        if ($product->QNT   - ($request->valueQNT -  $oldQnt)  < 0) {
 
             return response()->json(['code' => 2, 'msg' => 'Vous avez saisie une quatité supérieur']);
         } else {
@@ -470,7 +499,7 @@ class OrderController extends Controller
                 'profit' => ($productSession->peice * $request->valueQNT * $productSession->percentage) / 100,
             ]);
             $product->update([
-                'QNT' => $product->QNT + ($oldQnt  -  $request->valueQNT) ,
+                'QNT' => $product->QNT + ($oldQnt  -  $request->valueQNT),
             ]);
         }
         return response()->json(['code' => 1, 'msg' => 'Update avec succée']);
@@ -479,17 +508,17 @@ class OrderController extends Controller
     public function UpdatePriceProductSession(Request $request)
     {
         $productSession = productsession::where('product_ref', "=", $request->product_ref)->where('user_id', auth()->user()->id)->first();
-        $oldQnt=  $productSession->QNT ; 
+        $oldQnt =  $productSession->QNT;
 
 
         //incrisse Qnt product
         $product = Product::where('ref', $request->product_ref)->first();
-            $productSession->update([
-                'peice' => $request->checkbox_Price,
-                'QNT' => $request->valueQNT,
-                'total' => $request->checkbox_Price * $request->valueQNT,
-                'profit' => ($request->checkbox_Price * $request->valueQNT * $productSession->percentage) / 100,
-            ]);
+        $productSession->update([
+            'peice' => $request->checkbox_Price,
+            'QNT' => $request->valueQNT,
+            'total' => $request->checkbox_Price * $request->valueQNT,
+            'profit' => ($request->checkbox_Price * $request->valueQNT * $productSession->percentage) / 100,
+        ]);
 
         return response()->json(['code' => 1, 'msg' => 'Update avec succée']);
     }
@@ -503,9 +532,7 @@ class OrderController extends Controller
     }
 
     //Function to select client
-    public function selectClients(Request $request)
-    {
-    }
+    public function selectClients(Request $request) {}
 
     /**
      * Store a newly created resource in storage.
@@ -551,7 +578,7 @@ class OrderController extends Controller
      */
     public function edit(Order $order)
     {
-        if(!auth()->user()->hasRole('gerant BL|admin|master')) return redirect()->back();
+        if (!auth()->user()->hasRole('gerant BL|admin|master')) return redirect()->back();
         $orderData = $this->orderDetails($order->ref);
 
         return view('Dashboard.admin.orders.editorder', [
@@ -581,7 +608,7 @@ class OrderController extends Controller
      */
     public function destroy($id)
     {
-        if(!auth()->user()->hasRole('gerant BL|admin|master')) return redirect()->back();
+        if (!auth()->user()->hasRole('gerant BL|admin|master')) return redirect()->back();
         $order = Order::where('id', $id)->first();
         $DetailsOrder = DetailsOrder::where('order_id', '=', $order->ref)->get();
         $order->delete();

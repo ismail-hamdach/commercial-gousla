@@ -126,6 +126,9 @@
                                     <a class="nav-link" href="{{ route('orders.index') }}">Tout les commands</a>
                                 </li>
                                 <li class="nav-item">
+                                    <a class="nav-link" href="{{ route('orders.return') }}">Tout les retours</a>
+                                </li>
+                                <li class="nav-item">
                                     <a class="nav-link" href="{{ route('orders.create') }}">Ajouter command</a>
                                 </li>
                             </ul>

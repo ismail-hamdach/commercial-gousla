@@ -57,26 +57,39 @@ class invoiceController extends Controller
                 $ref_code = 'Ab_' . Str::random($length = 11);
             }
 
+            $total = $request->MethodPayment === 'retour' ? -abs($request->total) : $request->total;
+
             $order = Order::create([
-                // 'ref' => $ref_code,
                 'client_id' => $request->clients,
                 'payment_method' => $request->MethodPayment,
                 'depot_email' => $request->depotOrder,
-                'total' => $request->total,
+                'total' => $total,
                 'user_id' => auth()->user()->id,
             ]);
 
-            $productsession = productsession::where('user_id', auth()->user()->id)->select('id','priceAchat')->get()->toArray(); 
+            $productsession = productsession::where('user_id', auth()->user()->id)->select('id', 'priceAchat')->get()->toArray();
             for ($i = 0; $i < count($productsession); $i++) {
+                $quantity = $request->QNT_product_added[$i];
+                $price = $request->price_product_added[$i];
+                $itemTotal = $quantity * $price;
+                $profit = ($quantity * $price * $request->percentage_product_added[$i]) / 100;
+
+
+                if ($request->MethodPayment === 'retour') {
+                    $itemTotal = -abs($itemTotal);
+                    $profit = -abs(($quantity * $price * $request->percentage_product_added[$i]) / 100);
+                    $quantity = -abs($request->QNT_product_added[$i]);
+                }
+
                 $DetailsOrder = DetailsOrder::create([
                     'product_name' => $request->name_product_added[$i],
                     'order_id' => $order->ref,
-                    'QNT' => $request->QNT_product_added[$i],
+                    'QNT' => $quantity,
                     'percentage' => $request->percentage_product_added[$i],
-                    'price' => $request->price_product_added[$i],
+                    'price' => $price,
                     'priceAchat' => $productsession[$i]['priceAchat'],
-                    'total' => $request->QNT_product_added[$i] * $request->price_product_added[$i],
-                    'profit' => ($request->QNT_product_added[$i] * $request->price_product_added[$i] * $request->percentage_product_added[$i]) / 100,
+                    'total' => $itemTotal,
+                    'profit' => $profit,
                     'user_id' => auth()->user()->id,
                 ]);
             }
@@ -84,10 +97,14 @@ class invoiceController extends Controller
             $items = [];
 
             foreach (productsession::where('user_id', auth()->user()->id)->get() as $productsessionAll) {
+                $QNT = $productsessionAll->QNT;
+                if ($request->MethodPayment === 'retour') {
+                    $QNT = -abs($productsessionAll->QNT);
+                }
                 $items[] = [
                     'id' => $productsessionAll->product_ref,
                     'name' => $productsessionAll->name,
-                    'QNT' => $productsessionAll->QNT,
+                    'QNT' => $QNT,
                     'percentage' => $productsessionAll->percentage,
                     'peice' => $productsessionAll->peice,
                     'total' => $productsessionAll->total,
@@ -95,7 +112,7 @@ class invoiceController extends Controller
             }
 
             $clients = [];
-            
+
             foreach (Client::where('id', $request->clients)->get() as $client) {
 
                 $clients[] = [
@@ -137,8 +154,8 @@ class invoiceController extends Controller
             $details['items'] = $items;
             $details['clients'] = $clients;
             $details['orders'] = Order::where('ref', '=', $order->ref)->first();
-             
-           /*  $pdf = PDF::loadView('Dashboard.admin.Order_PDF.order_Pdf', $details, [
+
+            /*  $pdf = PDF::loadView('Dashboard.admin.Order_PDF.order_Pdf', $details, [
                 'title' => 'PDF Title',
                 'author' => 'PDF Author',
                 'showImageErrors' => true,
